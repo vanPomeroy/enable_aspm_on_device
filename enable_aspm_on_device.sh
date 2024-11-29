@@ -4,7 +4,7 @@
 # IT WAS IN THE WAY.. BUT LUIS STAYS ON TOP, MY MAN
 
 # ALSO I HAVE NO IDEA IF LUIS MADE THIS I CANNOT FIND THE ACTUAL SOURCE GIST FOR THIS,
-# IF I DEVELOP IT WILL BE HERE: 
+# IF I DEVELOP IT WILL BE HERE: https://github.com/abclution/enable_aspm_on_device
 # Pretty colors up top cause they get used earlier now.
 GREEN="\033[01;32m"
 YELLOW="\033[01;33m"
