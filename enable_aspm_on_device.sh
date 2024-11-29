@@ -2,9 +2,30 @@
 # Copyright (c) 2010-2013 Luis R. Rodriguez <mcgrof@do-not-panic.com>
 # Moved BIG FAT COPYRIGHT DOWN TO THE BOTTOM CAUSE WTF ITS A BASH SCRIPT AND
 # IT WAS IN THE WAY.. BUT LUIS STAYS ON TOP, MY MAN
-
-# ALSO I HAVE NO IDEA IF LUIS MADE THIS I CANNOT FIND THE ACTUAL SOURCE GIST FOR THIS,
+# ALSO I HAVE NO IDEA IF LUIS MADE THIS I CANNOT FIND THE ACTUAL SOURCE  FOR THIS,
+# LUIS GITHUB IS HERE JUST IN CASE https://github.com/mcgrof  HOWEVER
+# I GOT IT FROM HERE, https://gist.github.com/baybal/b499fc5811a7073df0c03ab8da4be904
 # IF I DEVELOP IT WILL BE HERE: https://github.com/abclution/enable_aspm_on_device
+
+# @abclution checked off these boxes so far. 
+# *DONE* Accept arguments for endpoint and root complex address, and  desired ASPM settings *DONE*
+# *DONE* Searching for your root complex for you *DONE*
+
+# TODO STILL
+# This can be improved by in this order:
+#
+#	* Look for your ASPM capabilities by quering your
+#	  LnkCap register first. Use these values to let you
+#	  select whether you want to enable only L1 or L1 & L0s
+#	* Search for your PCI device by using the driver
+#	* Disable your driver and ask to reboot ?
+#	* Rewrite in C
+#	* Write ncurses interface [ wishlist ]
+#	* Write GTK/QT interface [ wishlist ]
+#	* Submit upstream as aspm.c to the PCI Utilities, which are
+#	  maintained by Martin Mares <mj@ucw.cz>
+
+# 
 # Pretty colors up top cause they get used earlier now.
 GREEN="\033[01;32m"
 YELLOW="\033[01;33m"
@@ -97,6 +118,7 @@ if [[ -z "$ASPM_SETTING" ]]; then
 fi
 
 
+# Added auto finding of root complex
 
 
 # Validate Arguments should never reach here though
@@ -203,28 +225,7 @@ function aspm_setting_to_string()
 }
 
 
-###################################################################
-# Do not edit below here unless you are sending me a patch
-###################################################################
-#
-# TODO: patches are welcomed to me until we submit to to
-#       PCI Utilities upstream.
-#
-# This can be improved by in this order:
-#
-#	* Accept arguments for endpoint and root complex address, and
-#	  desired ASPM settings * DONE*
-#	* Look for your ASPM capabilities by quering your
-#	  LnkCap register first. Use these values to let you
-#	  select whether you want to enable only L1 or L1 & L0s
-#	* Searching for your root complex for you *DONE*
-#	* Search for your PCI device by using the driver
-#	* Disable your driver and ask to reboot ?
-#	* Rewrite in C
-#	* Write ncurses interface [ wishlist ]
-#	* Write GTK/QT interface [ wishlist ]
-#	* Submit upstream as aspm.c to the PCI Utilities, which are
-#	  maintained by Martin Mares <mj@ucw.cz>
+
 
 
 # we can surely read the spec to get a better value
