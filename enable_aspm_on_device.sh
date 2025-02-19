@@ -7,25 +7,25 @@
 # I GOT IT FROM HERE, https://gist.github.com/baybal/b499fc5811a7073df0c03ab8da4be904
 # IF I DEVELOP IT WILL BE HERE: https://github.com/abclution/enable_aspm_on_device
 
-# @abclution checked off these boxes so far. 
+# @abclution checked off these boxes so far.
 # *DONE* Accept arguments for endpoint and root complex address, and  desired ASPM settings *DONE*
 # *DONE* Searching for your root complex for you *DONE*
 
 # TODO STILL
 # This can be improved by in this order:
 #
-#	* Look for your ASPM capabilities by quering your
-#	  LnkCap register first. Use these values to let you
-#	  select whether you want to enable only L1 or L1 & L0s
-#	* Search for your PCI device by using the driver
-#	* Disable your driver and ask to reboot ?
-#	* Rewrite in C
-#	* Write ncurses interface [ wishlist ]
-#	* Write GTK/QT interface [ wishlist ]
-#	* Submit upstream as aspm.c to the PCI Utilities, which are
-#	  maintained by Martin Mares <mj@ucw.cz>
+#       * Look for your ASPM capabilities by quering your
+#         LnkCap register first. Use these values to let you
+#         select whether you want to enable only L1 or L1 & L0s
+#       * Search for your PCI device by using the driver
+#       * Disable your driver and ask to reboot ?
+#       * Rewrite in C
+#       * Write ncurses interface [ wishlist ]
+#       * Write GTK/QT interface [ wishlist ]
+#       * Submit upstream as aspm.c to the PCI Utilities, which are
+#         maintained by Martin Mares <mj@ucw.cz>
 
-# 
+#
 # Pretty colors up top cause they get used earlier now.
 GREEN="\033[01;32m"
 YELLOW="\033[01;33m"
@@ -38,19 +38,21 @@ UNDERLINE="\033[02m"
 
 # Usage Information
 function usage() {
-    echo "Usage: $0 [-e ENDPOINT] [-r ROOT_COMPLEX] [-s ASPM_SETTING]"
+    echo "Usage: $0 [-e ENDPOINT] [-r ROOT_COMPLEX] [-s ASPM_SETTING | -a]"
     echo "  -e ENDPOINT: PCI endpoint address (e.g., 03:00.0)"
     echo "  -r (OPTIONAL) ROOT_COMPLEX: PCI root complex address (e.g., 00:1c.4)"
     echo "  -s ASPM_SETTING: ASPM setting (0=L0, 1=L0s, 2=L1, 3=L1 and L0s)"
+    echo "  -a auto detect ASPM capability... '-s' and '-a' are mutually exclusive"
     exit 1
 }
 
 # Parse Arguments
-while getopts ":e:r:s:" opt; do
+while getopts ":e:r:s:a" opt; do
     case $opt in
         e) ENDPOINT="$OPTARG" ;;
         r) ROOT_COMPLEX="$OPTARG" ;;
         s) ASPM_SETTING="$OPTARG" ;;
+        a) ASPM_AUTO_DETECT=y;;
         *) usage ;;
     esac
 done
@@ -77,6 +79,17 @@ function find_root_complex() {
     return 0
 }
 
+function find_aspm_cap () {
+    case $(lspci -vv -s $ENDPOINT | grep LnkCap: |cut -f 4 -d,) in
+         " ASPM L0s L1") ASPM_SETTING=3;;
+             " ASPM L1") ASPM_SETTING=2;;
+            " ASPM L0s") ASPM_SETTING=1;;
+             " ASPM L0") ASPM_SETTING=0;;
+                      *) echo -e "${RED}Error: Unable to determine ASPM capability for ENDPOINT, $ENDPOINT ${NORMAL}"
+                         return 1;;
+    esac
+}
+
 # Validate Arguments
 if [[ -z "$ENDPOINT" ]]; then
     echo -e "${RED}ERROR: ENDPOINT is MISSING.${NORMAL}"
@@ -96,7 +109,7 @@ if [[ -z "$ROOT_COMPLEX"  ]]; then
     echo
     echo -e "Endpoint, $ENDPOINT"
     echo -e "Root Complex, $ROOT_COMPLEX"
-     
+
     echo
     else
     echo -e "${RED}Failed to automatically find Root Complex for Endpoint, $ENDPOINT ${NORMAL}"
@@ -104,10 +117,12 @@ if [[ -z "$ROOT_COMPLEX"  ]]; then
     exit 1
     fi
 
-    
+
 fi
 
-
+if [[ "$ASPM_AUTO_DETECT" = "y" ]]; then
+   find_aspm_cap
+fi
 
 
 # Validate Arguments
@@ -117,35 +132,11 @@ if [[ -z "$ASPM_SETTING" ]]; then
     usage
 fi
 
-
-# Added auto finding of root complex
-
-
 # Validate Arguments should never reach here though
 if [[ -z "$ENDPOINT" || -z "$ROOT_COMPLEX" || -z "$ASPM_SETTING" ]]; then
     echo -e "${RED}Error: Missing required arguments.${NORMAL}"
     usage
 fi
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 # Validate ASPM_SETTING is a valid value (0-3)
 if ! [[ "$ASPM_SETTING" =~ ^[0-3]$ ]]; then
@@ -206,22 +197,22 @@ echo -e "Using ASPM Setting: $ASPM_SETTING"
 
 function aspm_setting_to_string()
 {
-	case $1 in
-	0)
-		echo -e "\t${BLUE}L0 only${NORMAL}, ${RED}ASPM disabled${NORMAL}"
-		;;
-	1)
-		;;
-	2)
-		echo -e "\t${GREEN}L1 only${NORMAL}"
-		;;
-	3)
-		echo -e "\t${GREEN}L1 and L0s${NORMAL}"
-		;;
-	*)
-		echo -e "\t${RED}Invalid${NORMAL}"
-		;;
-	esac
+        case $1 in
+        0)
+                echo -e "\t${BLUE}L0 only${NORMAL}, ${RED}ASPM disabled${NORMAL}"
+                ;;
+        1)
+                ;;
+        2)
+                echo -e "\t${GREEN}L1 only${NORMAL}"
+                ;;
+        3)
+                echo -e "\t${GREEN}L1 and L0s${NORMAL}"
+                ;;
+        *)
+                echo -e "\t${RED}Invalid${NORMAL}"
+                ;;
+        esac
 }
 
 
@@ -237,18 +228,18 @@ ROOT_PRESENT=$(lspci | grep -c "$ROOT_COMPLEX")
 ENDPOINT_PRESENT=$(lspci | grep -c "$ENDPOINT")
 
 if [[ $(id -u) != 0 ]]; then
-	echo -e "This needs to be run as root"
-	exit 1
+        echo -e "This needs to be run as root"
+        exit 1
 fi
 
 if [[ $ROOT_PRESENT -eq 0 ]]; then
-	echo -e "Root complex $ROOT_COMPLEX is not present"
-	exit
+        echo -e "Root complex $ROOT_COMPLEX is not present"
+        exit
 fi
 
 if [[ $ENDPOINT_PRESENT -eq 0 ]]; then
-	echo -e "Endpoint $ENDPOINT is not present"
-	exit
+        echo -e "Endpoint $ENDPOINT is not present"
+        exit
 fi
 
 # XXX: lspci -s some_device_not_existing does not return positive
@@ -256,120 +247,120 @@ fi
 function device_present()
 {
 
-	PRESENT=$(lspci | grep -c "$1")
-	COMPLAINT="${RED}not present${NORMAL}"
+        PRESENT=$(lspci | grep -c "$1")
+        COMPLAINT="${RED}not present${NORMAL}"
 
-	if [[ $PRESENT -eq 0 ]]; then
-		if [[ $2 != "present" ]]; then
-			COMPLAINT="${RED}disappeared${NORMAL}"
-		fi
+        if [[ $PRESENT -eq 0 ]]; then
+                if [[ $2 != "present" ]]; then
+                        COMPLAINT="${RED}disappeared${NORMAL}"
+                fi
 
-		echo -e "Device ${BLUE}${1}${NORMAL} $COMPLAINT" 
-		return 1
-	fi
-	return 0
+                echo -e "Device ${BLUE}${1}${NORMAL} $COMPLAINT"
+                return 1
+        fi
+        return 0
 }
 
 function find_aspm_byte_address()
 {
-	device_present $ENDPOINT present
-	if [[ $? -ne 0 ]]; then
-		exit
-	fi
+        device_present $ENDPOINT present
+        if [[ $? -ne 0 ]]; then
+                exit
+        fi
 
-	SEARCH=$(setpci -s $1 34.b)
-	# We know on the first search $SEARCH will not be
-	# 10 but this simplifies the implementation.
-	while [[ $SEARCH != 10 && $SEARCH_COUNT -le $MAX_SEARCH ]]; do
-		END_SEARCH=$(setpci -s $1 ${SEARCH}.b)
+        SEARCH=$(setpci -s $1 34.b)
+        # We know on the first search $SEARCH will not be
+        # 10 but this simplifies the implementation.
+        while [[ $SEARCH != 10 && $SEARCH_COUNT -le $MAX_SEARCH ]]; do
+                END_SEARCH=$(setpci -s $1 ${SEARCH}.b)
 
-		# Convert hex digits to uppercase for bc
-		SEARCH_UPPER=$(printf "%X" 0x${SEARCH})
+                # Convert hex digits to uppercase for bc
+                SEARCH_UPPER=$(printf "%X" 0x${SEARCH})
 
-		if [[ $END_SEARCH = 10 ]]; then
-			ASPM_BYTE_ADDRESS=$(echo "obase=16; ibase=16; $SEARCH_UPPER + 10" | bc)
-			break
-		fi
+                if [[ $END_SEARCH = 10 ]]; then
+                        ASPM_BYTE_ADDRESS=$(echo "obase=16; ibase=16; $SEARCH_UPPER + 10" | bc)
+                        break
+                fi
 
-		SEARCH=$(echo "obase=16; ibase=16; $SEARCH_UPPER + 1" | bc)
-		SEARCH=$(setpci -s $1 ${SEARCH}.b)
+                SEARCH=$(echo "obase=16; ibase=16; $SEARCH_UPPER + 1" | bc)
+                SEARCH=$(setpci -s $1 ${SEARCH}.b)
 
-		let SEARCH_COUNT=$SEARCH_COUNT+1
-	done
+                let SEARCH_COUNT=$SEARCH_COUNT+1
+        done
 
-	if [[ $SEARCH_COUNT -ge $MAX_SEARCH ]]; then
-		echo -e "Long loop while looking for ASPM word for $1"
-		return 1
-	fi
-	return 0
+        if [[ $SEARCH_COUNT -ge $MAX_SEARCH ]]; then
+                echo -e "Long loop while looking for ASPM word for $1"
+                return 1
+        fi
+        return 0
 }
 
 function enable_aspm_byte()
 {
-	device_present $1 present
-	if [[ $? -ne 0 ]]; then
-		exit
-	fi
+        device_present $1 present
+        if [[ $? -ne 0 ]]; then
+                exit
+        fi
 
-	find_aspm_byte_address $1
-	if [[ $? -ne 0 ]]; then
-		return 1
-	fi
+        find_aspm_byte_address $1
+        if [[ $? -ne 0 ]]; then
+                return 1
+        fi
 
-	ASPM_BYTE_HEX=$(setpci -s $1 ${ASPM_BYTE_ADDRESS}.b)
-	ASPM_BYTE_HEX=$(printf "%X" 0x${ASPM_BYTE_HEX})
-	# setpci doesn't support a mask on the query yet, only on the set,
-	# so to verify a setting on a mask we have no other optoin but
-	# to do do this stuff ourselves.
-	DESIRED_ASPM_BYTE_HEX=$(printf "%X" $(( (0x${ASPM_BYTE_HEX} & ~0x7) |0x${ASPM_SETTING})))
+        ASPM_BYTE_HEX=$(setpci -s $1 ${ASPM_BYTE_ADDRESS}.b)
+        ASPM_BYTE_HEX=$(printf "%X" 0x${ASPM_BYTE_HEX})
+        # setpci doesn't support a mask on the query yet, only on the set,
+        # so to verify a setting on a mask we have no other optoin but
+        # to do do this stuff ourselves.
+        DESIRED_ASPM_BYTE_HEX=$(printf "%X" $(( (0x${ASPM_BYTE_HEX} & ~0x7) |0x${ASPM_SETTING})))
 
-	if [[ $ASPM_BYTE_ADDRESS = "INVALID" ]]; then
-		echo -e "No ASPM byte could be found for $(lspci -s $1)"
-		return
-	fi
+        if [[ $ASPM_BYTE_ADDRESS = "INVALID" ]]; then
+                echo -e "No ASPM byte could be found for $(lspci -s $1)"
+                return
+        fi
 
-	echo -e "$(lspci -s $1)"
-	echo -en "\t${YELLOW}0x${ASPM_BYTE_ADDRESS}${NORMAL} : ${CYAN}0x${ASPM_BYTE_HEX}${GREEN} --> ${BLUE}0x${DESIRED_ASPM_BYTE_HEX}${NORMAL} ... "
+        echo -e "$(lspci -s $1)"
+        echo -en "\t${YELLOW}0x${ASPM_BYTE_ADDRESS}${NORMAL} : ${CYAN}0x${ASPM_BYTE_HEX}${GREEN} --> ${BLUE}0x${DESIRED_ASPM_BYTE_HEX}${NORMAL} ... "
 
-	device_present $1 present
-	if [[ $? -ne 0 ]]; then
-		exit
-	fi
+        device_present $1 present
+        if [[ $? -ne 0 ]]; then
+                exit
+        fi
 
-	# Avoid setting if already set
-	if [[ $ASPM_BYTE_HEX = $DESIRED_ASPM_BYTE_HEX ]]; then
-		echo -e "[${GREEN}SUCCESS${NORMAL}] (${GREEN}already set${NORMAL})"
-		aspm_setting_to_string $ASPM_SETTING
-		return 0
-	fi
+        # Avoid setting if already set
+        if [[ $ASPM_BYTE_HEX = $DESIRED_ASPM_BYTE_HEX ]]; then
+                echo -e "[${GREEN}SUCCESS${NORMAL}] (${GREEN}already set${NORMAL})"
+                aspm_setting_to_string $ASPM_SETTING
+                return 0
+        fi
 
-	# This only writes the last 3 bits
-	setpci -s $1 ${ASPM_BYTE_ADDRESS}.b=${ASPM_SETTING}:3
+        # This only writes the last 3 bits
+        setpci -s $1 ${ASPM_BYTE_ADDRESS}.b=${ASPM_SETTING}:3
 
-	sleep 3
+        sleep 3
 
-	ACTUAL_ASPM_BYTE_HEX=$(setpci -s $1 ${ASPM_BYTE_ADDRESS}.b)
-	ACTUAL_ASPM_BYTE_HEX=$(printf "%X" 0x${ACTUAL_ASPM_BYTE_HEX})
+        ACTUAL_ASPM_BYTE_HEX=$(setpci -s $1 ${ASPM_BYTE_ADDRESS}.b)
+        ACTUAL_ASPM_BYTE_HEX=$(printf "%X" 0x${ACTUAL_ASPM_BYTE_HEX})
 
-	# Do not retry this if it failed, if it failed to set.
-	# Likey if it failed its a good reason and you should look
-	# into that.
-	if [[ $ACTUAL_ASPM_BYTE_HEX != $DESIRED_ASPM_BYTE_HEX ]]; then
-		echo -e "\t[${RED}FAIL${NORMAL}] (0x${ACTUAL_ASPM_BYTE_HEX})"
-		return 1
-	fi
+        # Do not retry this if it failed, if it failed to set.
+        # Likey if it failed its a good reason and you should look
+        # into that.
+        if [[ $ACTUAL_ASPM_BYTE_HEX != $DESIRED_ASPM_BYTE_HEX ]]; then
+                echo -e "\t[${RED}FAIL${NORMAL}] (0x${ACTUAL_ASPM_BYTE_HEX})"
+                return 1
+        fi
 
-	echo -e "\t[${GREEN}SUCCESS]${NORMAL}]"
-	aspm_setting_to_string $ASPM_SETTING
+        echo -e "\t[${GREEN}SUCCESS]${NORMAL}]"
+        aspm_setting_to_string $ASPM_SETTING
 
-	return 0
+        return 0
 }
 
 device_present $ENDPOINT not_sure
 if [[ $? -ne 0 ]]; then
-	exit
+        exit
 fi
-# 
+#
 # echo -e "${CYAN}Root complex${NORMAL}:"
 # ROOT_COMPLEX="00:1c.0"
 # enable_aspm_byte $ROOT_COMPLEX
@@ -380,7 +371,7 @@ fi
 # ROOT_COMPLEX="00:1d.0"
 # enable_aspm_byte $ROOT_COMPLEX
 # echo
-# 
+#
 # echo -e "${CYAN}Endpoint${NORMAL}:"
 # ENDPOINT="3a:00.0"
 # enable_aspm_byte $ENDPOINT
@@ -424,4 +415,3 @@ echo
 # WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
